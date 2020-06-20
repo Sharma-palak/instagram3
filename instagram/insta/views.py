@@ -2,6 +2,7 @@
 from rest_framework import generics
 from django.shortcuts import get_object_or_404
 #from .filters import UserFilter
+from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 User=get_user_model()
@@ -15,10 +16,13 @@ from rest_framework.response import Response
 from instagram.settings import EMAIL_HOST_USER
 from django.template.loader import render_to_string
 from django.contrib import messages
+from django.utils import timezone
+from datetime import timedelta
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from .tokens import account_activation_token
+# from .tokens import account_activation_token
 from django.core.mail import send_mail
 from .models import *
 import random
@@ -370,7 +374,7 @@ class UserCreateAPIView(generics.CreateAPIView):
             to_email = [user.email]
             send_mail(mail_subject, message, from_mail, to_email, fail_silently=False)
             messages.success(request, 'Confirm your email to complete registering with Instagram.')
-            return Response({'message': 'Please confirm your email address to complete the registration',},
+            return Response({'message': 'Please confirm your email address to complete the registration','user_id':user.id},
                             status=status.HTTP_201_CREATED)
         return Response("bad attempt", status=status.HTTP_400_BAD_REQUEST)
 
@@ -382,23 +386,144 @@ class otp_verify(APIView):
 
     def post(self,request,id,*args,**kwargs):
         otp=request.data.get('otp')
-        u=User.objects.filter(id=id)
+        if (not otp):
+            return Response({'detail': 'No otp'})
+        try:
+          u=User.objects.get(id=id)
+        except (IndexError,ObjectDoesNotExist,OverflowError):
+            return Response({'detail':'Invalid user'})
         print(u)
-        otp_object=otp_generate.objects.filter(user=u[0])
+        try:
+          otp_object=otp_generate.objects.get(user=u)
+        except (IndexError,ObjectDoesNotExist):
+            return Response({'detail':'otp does not exist'})
         print(otp_object)
         print(type(otp))
+        print(timezone.now())
+        print(otp_object.otp_sent)
+        if(timezone.now()-otp_object.otp_sent>=timedelta(days=0,hours=0,minutes=6,seconds=0)):
+            otp_object.delete()
+            return Response({'detail':'Otp expires!!'})
+
         try:
-            otp_object[0].otp==int(otp)
-        except IndexError:
+            otp_object.otp==int(otp)
+        except (IndexError,TypeError,OverflowError):
             return Response({'detail':'incorrect otp'})
-        # u.is_active=True
-        # u.save()
-        u.update(is_active=True)
-        otp_object[0].delete()
+        u.is_active=True
+        u.save()
+        # u.update(is_active=True)
+        otp_object.delete()
         return Response({'detail':'verified'})
+class Resent_Otp(APIView):
+    permission_classes = (permissions.AllowAny,)
+    queryset = otp_generate.objects.all()
+    serializer_class = OtpSerializer
+    def get(self,request,id,*args,**kwargs):
+        try:
+          user=User.objects.get(id=id)
+        except (IndexError,ObjectDoesNotExist):
+            return Response({'detail':'user does not exist'})
+        if(user and user.is_active==True):
+            return Response({'detail':'user already verified!!'})
+
+        if(user):
+            old_otp=otp_generate.objects.filter(id=id)
+            if(old_otp):
+                old_otp.delete()
+            otp = random.randint(999, 9999)
+            otp_key = otp_generate.objects.create(user=user, otp=otp)
+            otp_key.save()
+            print(otp_key.otp)
+            print(otp_key.user)
+            from_mail = EMAIL_HOST_USER
+            mail_subject = 'Activate your instagram account.'
+            message = render_to_string('insta/action.html', {
+                'user': user,
+                # 'domain': current_site.domain,
+                'otp': otp_key.otp,
+            })
+            to_email = [user.email]
+            send_mail(mail_subject, message, from_mail, to_email, fail_silently=False)
+            messages.success(request, 'Confirm your email to complete registering with Instagram.')
+            return Response({'message': 'Please confirm your email address to complete the registration','user_id':user.id },
+                            status=status.HTTP_201_CREATED)
+
+        else:
+            return Response({'detail':'Invalid User'})
+class ForgotPasswordEmail(APIView):
+    permission_classes = (permissions.AllowAny,)
+    queryset = User.objects.all()
+    serializer_class = PasswordEmail
+    def post(self,request,*args,**kwargs):
+        serializer=PasswordEmail(data=request.data)
+        if(serializer.is_valid()):
+            email=serializer.data.get('email_field')
+            try:
+                user = User.objects.get(email=email)
+                old_otp = otp_generate.objects.filter(user=user)
+                if(old_otp):
+                    old_otp.delete()
+                otp = random.randint(999, 9999)
+                otp_key = otp_generate.objects.create(user=user, otp=otp)
+                otp_key.save()
+                print(otp_key.otp)
+                print(otp_key.user)
+                from_mail = EMAIL_HOST_USER
+                mail_subject = 'Forgot Password OTP of instagram account.'
+                message = render_to_string('insta/action.html', {
+                    'user': user,
+                    # 'domain': current_site.domain,
+                    'otp': otp_key.otp,
+                })
+                to_email = [user.email]
+                send_mail(mail_subject, message, from_mail, to_email, fail_silently=False)
+                messages.success(request, 'Confirm your email to complete registering with Instagram.')
+                return Response({'message': 'Please confirm your email address to complete the registration','user_id':user.id },
+                                status=status.HTTP_201_CREATED)
+            except (User.DoesNotExist,IndexError,ObjectDoesNotExist):
+                return Response({'detail':'User does not exist'})
+        else:
+            return Response({'detail':'Invalid Email'})
+class NewPassword(APIView):
+    permission_classes = (permissions.AllowAny,)
+    queryset = otp_generate.objects.all()
+    serializer_class = ChangePassword
+    def post(self,request,id,*args,**kwargs):
+        serial= ChangePassword(data =request.data)
+        if serial.is_valid():
+            otp=serial.data.get('otp')
+            new_password=serial.data.get('new_password')
+            confirm_password=serial.data.get('confirm_password')
+            try:
+                u=User.objects.get(id=id)
+            except(User.DoesNotExist,IndexError,ObjectDoesNotExist):
+                return Response({'detail':'Invalid user'})
+            try:
+                otp_object=otp_generate.objects.get(user=u)
+            except(ObjectDoesNotExist,IndexError):
+                return Response({'detail':'invalid '})
+            if(otp_object.otp!=otp):
+                return Response({'detail':'otp did not match!!'})
+            elif(new_password!=confirm_password):
+                return Response({'detail':'passwords did not match!!'})
+            elif(len(new_password)<=4):
+                return Response({'detail':'Password too short'})
+            else:
+                u.set_password(new_password)
+                u.save()
+                otp_object.delete()
+                return Response({'detail':'Your password has been changed successfully!!'})
+
+
+        else:
+            return Response({'detail':'invalid data!!'})
+
+
+
 
 class Request(viewsets.ModelViewSet):
     queryset = FriendRequest.objects.all()
+    permission_classes = [IsAuthenticated]
     serializer_class = RequestSerializer
     def get_queryset(self, *args, **kwargs):
         return FriendRequest.objects.filter(to_user=self.request.user)
@@ -442,6 +567,7 @@ class Request(viewsets.ModelViewSet):
         queryset=FriendRequest.objects.filter(to_user=self.request.user,id=pk)
         queryset.delete()
         return Response({'detail':'friend request declined'})
+
 
 
 

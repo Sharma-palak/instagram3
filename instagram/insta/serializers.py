@@ -159,8 +159,19 @@ class OtpSerializer(serializers.ModelSerializer):
 
     class Meta:
         model= otp_generate
-        fields = ('user','otp')
+        fields = ('user','otp','otp_sent')
         read_only_fields= ['user']
+class PasswordEmail(serializers.Serializer):
+    email_field=serializers.EmailField(required=True)
+    class Meta:
+        field='email_field'
+class ChangePassword(serializers.Serializer):
+    new_password=serializers.CharField(style={'input_type': 'password'},required=True)
+    confirm_password=serializers.CharField(style={'input_type': 'password'},required=True)
+    otp = serializers.IntegerField(default=0)
+    class Meta:
+        field=('otp','new_password','otp')
+
 class RequestSerializer(serializers.ModelSerializer):
     p=serializers.SerializerMethodField()
     q = serializers.SerializerMethodField()
@@ -179,4 +190,3 @@ class RequestSerializer(serializers.ModelSerializer):
         print(k)
         seria = ProfileSerializer(k)
         return (seria.data)
-    

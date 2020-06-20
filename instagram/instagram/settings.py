@@ -99,6 +99,12 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(os.path.dirname(BASE_DIR), 'db.sqlite3'),
+#     }
+# }
 
 
 # Password validation
@@ -183,8 +189,8 @@ STATICFILES_DIRS = (
 
 EMAIL_USE_TLS = True
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_USER = 'palak.290699@gmail.com'
-EMAIL_HOST_PASSWORD = 'instagram29'
+EMAIL_HOST_USER = 'instagram29062020@gmail.com'
+EMAIL_HOST_PASSWORD = 'year2020'
 EMAIL_PORT = 587
 AUTH_USER_MODEL = "insta.User"
 APPEND_SLASH=False

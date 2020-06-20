@@ -23,10 +23,13 @@ urlpatterns = [
     path('logout/',LogoutView.as_view()),
     url(r'^like/(?P<postid>[0-9]+)/$',LikeView.as_view()),
     url(r'^comment/(?P<postid>[0-9]+)/$',CommentView.as_view()),
-    #url('^add_friend/(?P<operation>[0-9]+)/$',Add_Friend.as_view()),
+    # url('^add_friend/(?P<operation>[0-9]+)/$',Add_Friend.as_view()),
     url(r'^register/$', UserCreateAPIView.as_view(),name='register'),
     #url(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
     #Activate.as_view(), name='activate'),
     url('^friend_list/(?P<userid>[0-9]+)/$',Friend_List.as_view()),
     url('^otp_activate/(?P<id>[0-9]+)/$',otp_verify.as_view()),
+    url('^resend_otp/(?P<id>[0-9]+)/$',Resent_Otp.as_view()),
+    url('forgot_password/',ForgotPasswordEmail.as_view()),
+    url('set_password/(?P<id>[0-9]+)/$',NewPassword.as_view())
 ]
