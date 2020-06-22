@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 import os
 import datetime
 import django_heroku
+import dj_database_url
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +27,7 @@ SECRET_KEY = 'bi31n$+^ug4s14=+9==fisa(*3125v_6-bve6i+@gemo@8g+n5'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-ALLOWED_HOSTS = ['127.0.0.1','40e84c56.ngrok.io']
+ALLOWED_HOSTS = ['127.0.0.1','40e84c56.ngrok.io','*']
 
 INSTALLED_APPS = [
     'rest_framework',
@@ -197,3 +198,5 @@ AUTH_USER_MODEL = "insta.User"
 APPEND_SLASH=False
 # Activate Django-Heroku.
 django_heroku.settings(locals())
+db_from_env = dj_database_url.config(conn_max_age=500)
+DATABASES['default'].update(db_from_env)
